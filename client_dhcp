@@ -1,0 +1,28 @@
+from scapy.all import *
+from scapy.layers.dhcp import *
+def filter_dhcp(packet):
+    return DHCP in packet
+def dhcp_handler_2(packet):
+    print("enter part2\n")
+    if DHCP in pkt and packet[DHCP].options[0][1] == 2 and packet[DHCP].options[1][1] != '0.0.0.0':
+        print("dhcp offer packet capture")
+        address_weWant=packet[DHCP].options[3][1]
+        print(address_weWant)
+        request_packet = Ether(dst='ff:ff:ff:ff:ff:ff', src='00:11:22:33:44:55') /\
+                         IP(src='0.0.0.0', dst='255.255.255.255') / UDP(sport=68, dport=67) \
+                         / BOOTP(chaddr='00:11:22:33:44:55', xid=0x12345678) /\
+                         DHCP(options=[('message-type', 'request'), ('server_id', '192.168.0.1'),
+                                       ('requested_addr', '192.168.0.100'), 'end'])
+        sendp(request_packet)
+def simple_function(packet):
+    print("got packet\n")
+if __name__=="__main__":
+    discover_packet = Ether(dst="ff:ff:ff:ff:ff:ff") /  IP(src="0.0.0.0", dst="255.255.255.255") /  UDP(sport=67, dport=68) / BOOTP( xid=random.randint(1, 1000000000), flags=1,chaddr="00:11:22:33:44:55") / DHCP(options=[("message-type", "discover"), "end"])
+    # discover_packet.show()
+    if DHCP in discover_packet:
+        print("yes\n")
+    sendp(discover_packet)
+    print("snif\n")
+    sniffer = sniff(filter="udp and (port 67 or port 68)")
+    #sniffer=sniff(count=1,prn=simple_function)
+    sniffer.show()
