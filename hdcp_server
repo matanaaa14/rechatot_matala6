@@ -1,0 +1,49 @@
+import ipaddress
+from scapy.all import *
+from scapy.layers.dhcp import *
+
+
+
+
+
+def filter_dhcp(packet):
+    return DHCP in packet
+def dhcp_handler(packet):
+    # Extract the client's MAC address from the Ethernet header
+    client_mac = packet[Ether].src
+
+    # Extract the transaction ID from the BOOTP header
+    transaction_id = packet[BOOTP].xid
+
+    # Extract the DHCP message type from the DHCP options
+    dhcp_options = packet[DHCP].options
+    dhcp_message_type = [opt[1] for opt in dhcp_options if opt[0] == "message-type"][0]
+
+    print("in dhcp handler\n")
+    # Define the network range
+    subnet = ipaddress.ip_network('10.0.2.0/24')
+    # Create a list of available IP addresses
+    ip_pool = []
+    for ip in subnet.hosts():
+        ip_pool.append(str(ip))
+    free_address = ip_pool[1]
+    my_address = ip_pool[0]
+    if DHCP in packet and any(opt[0] == 'message-type' and opt[1] == 1 for opt in packet[DHCP].options):
+        print('DHCP Discover message')
+        # Create DHCP offer
+        offer_packet=Ether(dst="ff:ff:ff:ff:ff:ff") /    IP(src="10.0.2.1", dst="255.255.255.255")/  UDP(sport=68, dport=67)/ BOOTP(xid=transaction_id,flag=2, yiaddr=free_address, siaddr="10.0.2.1", giaddr="0.0.0.0",) /  DHCP(options=[("message-type", "offer"),
+                               ("subnet_mask", "255.255.255.0"),
+                               ("router", my_address),
+                               ("name_server", "8.8.8.8"),
+                               "end"])
+    sendp(offer_packet)
+    print("send offer\n")
+def simple_packet(packet):
+    packet2=Ether(dst="ff:ff:ff:ff:ff:ff") / \
+    IP(src="0.0.0.0", dst="255.255.255.255") / \
+    UDP(sport=67, dport=68) / \
+    BOOTP(chaddr="00:11:22:33:44:55", xid=random.randint(1, 1000000000), flags=0x8000) / \
+    DHCP(options=[("message-type", "discover"), "end"])
+    sendp(packet2)
+if __name__ == "__main__":
+    sniffer = sniff(count =1,filter="udp and (port 67 or port 68)", prn=simple_packet)
